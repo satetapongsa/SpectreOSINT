@@ -165,6 +165,56 @@ def extract_reddit(username: str, html_text: str = None) -> Dict[str, Any]:
         return {}
     return extract_generic(html_text, username)
 
+def extract_instagram(username: str, html_text: str = None) -> Dict[str, Any]:
+    if not html_text:
+        html_text = fetch_html(f"https://www.instagram.com/{username}/")
+    if not html_text:
+        return {}
+    soup = BeautifulSoup(html_text, "html.parser")
+    og_title = soup.find("meta", property="og:title")
+    fullname = None
+    if og_title and og_title.get("content"):
+        title_val = og_title.get("content")
+        if "@" in title_val:
+            fullname = title_val.split("(")[0].strip()
+    og_desc = soup.find("meta", property="og:description")
+    bio = og_desc.get("content") if og_desc else None
+    og_img = soup.find("meta", property="og:image")
+    avatar = og_img.get("content") if og_img else None
+    return {"fullname": fullname or username, "avatar": avatar, "bio": bio}
+
+def extract_tiktok(username: str, html_text: str = None) -> Dict[str, Any]:
+    if not html_text:
+        html_text = fetch_html(f"https://www.tiktok.com/@{username}")
+    if not html_text:
+        return {}
+    soup = BeautifulSoup(html_text, "html.parser")
+    og_title = soup.find("meta", property="og:title")
+    fullname = None
+    if og_title and og_title.get("content"):
+        fullname = og_title.get("content").split(" on TikTok")[0].strip()
+    og_desc = soup.find("meta", property="og:description")
+    bio = og_desc.get("content") if og_desc else None
+    og_img = soup.find("meta", property="og:image")
+    avatar = og_img.get("content") if og_img else None
+    return {"fullname": fullname or username, "avatar": avatar, "bio": bio}
+
+def extract_facebook(username: str, html_text: str = None) -> Dict[str, Any]:
+    if not html_text:
+        html_text = fetch_html(f"https://www.facebook.com/{username}/")
+    if not html_text:
+        return {}
+    soup = BeautifulSoup(html_text, "html.parser")
+    og_title = soup.find("meta", property="og:title")
+    fullname = None
+    if og_title and og_title.get("content"):
+        fullname = og_title.get("content").split("|")[0].strip()
+    og_desc = soup.find("meta", property="og:description")
+    bio = og_desc.get("content") if og_desc else None
+    og_img = soup.find("meta", property="og:image")
+    avatar = og_img.get("content") if og_img else None
+    return {"fullname": fullname or username, "avatar": avatar, "bio": bio}
+
 EXTRACTORS = {
     "GitHub": extract_github,
     "GitLab": extract_gitlab,
@@ -173,7 +223,11 @@ EXTRACTORS = {
     "Telegram": extract_telegram,
     "Steam": extract_steam,
     "Reddit": extract_reddit,
+    "Instagram": extract_instagram,
+    "TikTok": extract_tiktok,
+    "Facebook": extract_facebook,
 }
+
 
 def deep_extract(platform: str, username: str, html_text: str = None) -> Dict[str, Any]:
     func = EXTRACTORS.get(platform)
