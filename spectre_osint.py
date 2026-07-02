@@ -47,7 +47,7 @@ session.mount('https://', adapter)
 
 _rate_limit_lock = threading.Lock()
 _last_request_time = {}
-MIN_INTERVAL = 0
+MIN_INTERVAL = 0.1
 
 def _rate_limit(url: str):
     """Enforce a minimum interval between requests to the same domain."""
@@ -79,7 +79,7 @@ session.mount('https://', adapter)
 
 _rate_limit_lock = threading.Lock()
 _last_request_time = {}
-MIN_INTERVAL = 0
+MIN_INTERVAL = 0.1
 
 # Default list of User‑Agent strings (common browsers)
 USER_AGENTS = [
@@ -1347,7 +1347,7 @@ PLATFORMS = {
     }
 }
 
-_TOP_100_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "top_100_platforms.json")
+_TOP_100_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "top_platforms.json")
 try:
     with open(_TOP_100_PATH, "r", encoding="utf-8") as _f:
         _TOP_100 = set(json.load(_f))
@@ -2651,8 +2651,8 @@ def main():
             while not initial_username:
                 initial_username = input("Username cannot be empty. Please enter again: ").strip()
             
-        threads = 30
-        timeout = 2.0
+        threads = 20
+        timeout = 4.0
         deep = True
         
         run_osint_search_cli(initial_username, max_threads=threads, timeout=timeout, deep_scan=deep)
