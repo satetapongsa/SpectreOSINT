@@ -1369,6 +1369,9 @@ PLATFORMS["Gmail"] = {
     "error_type": "custom"
 }
 
+# Sort PLATFORMS so that Social Media is always prioritized first in execution and display order
+PLATFORMS = dict(sorted(PLATFORMS.items(), key=lambda x: (0 if x[1].get("category") == "Social Media" else 1, x[0])))
+
 import random
 
 USER_AGENTS = [
@@ -1600,6 +1603,76 @@ def check_single_site(site_name, site_info, username, timeout):
                 return {"site": site_name, "url": f"mailto:{email_check}", "exists": False, "category": category}
         except Exception:
             return {"site": site_name, "url": f"mailto:{email_check}", "exists": None, "error": "API Error", "category": category}
+
+    elif site_name == "Instagram":
+        try:
+            # 1. Direct Instagram check
+            direct_url = f"https://www.instagram.com/{username}/"
+            response = safe_get(direct_url, headers=get_random_headers(), timeout=timeout)
+            
+            exists = False
+            metadata = {}
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                title_text = soup.title.string.strip().lower() if soup.title and soup.title.string else ""
+                
+                # Check if it's the login wall / not found
+                is_login_or_unavailable = False
+                if title_text in ["instagram", "login • instagram", "sign in", "signin"]:
+                    is_login_or_unavailable = True
+                
+                if not is_login_or_unavailable:
+                    # Verify if username is in title or description meta
+                    meta_desc = soup.find('meta', {'name': 'description'}) or soup.find('meta', {'property': 'og:description'})
+                    meta_content = meta_desc.get('content', '') if meta_desc else ''
+                    
+                    if f"@{username.lower()}" in title_text or f"@{username.lower()}" in meta_content.lower() or "followers" in meta_content.lower():
+                        exists = True
+                        # Parse basic meta
+                        fullname = None
+                        og_title = soup.find("meta", property="og:title")
+                        if og_title and og_title.get("content"):
+                            t_val = og_title.get("content")
+                            if "@" in t_val:
+                                fullname = t_val.split("(")[0].strip()
+                        bio = meta_content if meta_content else None
+                        og_img = soup.find("meta", property="og:image")
+                        avatar = og_img.get("content") if og_img else None
+                        metadata = {"fullname": fullname or username, "bio": bio, "avatar": avatar}
+
+            # 2. Fallback to Dumpor if direct check is not found or rate-limited
+            if not exists:
+                fallback_url = f"https://dumpor.io/v/{username}"
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                response_fb = safe_get(fallback_url, headers=headers, timeout=timeout)
+                if response_fb.status_code == 200:
+                    soup_fb = BeautifulSoup(response_fb.text, 'html.parser')
+                    og_title = soup_fb.find("meta", property="og:title")
+                    title_content = og_title.get("content", "") if og_title else ""
+                    if username.lower() in title_content.lower():
+                        exists = True
+                        fullname = username
+                        if title_content:
+                            fullname = title_content.split("Watch")[0].strip()
+                        og_desc = soup_fb.find("meta", property="og:description")
+                        bio = og_desc.get("content") if og_desc else None
+                        og_img = soup_fb.find("meta", property="og:image")
+                        avatar = og_img.get("content") if og_img else None
+                        metadata = {"fullname": fullname or username, "bio": bio, "avatar": avatar}
+
+            if exists:
+                wayback = {"available": False}
+                try:
+                    wayback = check_wayback_archive(target_url)
+                except:
+                    pass
+                return {"site": site_name, "url": target_url, "exists": True, "category": category, "metadata": metadata, "wayback": wayback}
+            else:
+                return {"site": site_name, "url": target_url, "exists": False, "category": category}
+
+        except Exception:
+            return {"site": site_name, "url": target_url, "exists": False, "category": category}
 
     # 2. General HTTP parsing check for other platforms
     try:
