@@ -1932,32 +1932,49 @@ def make_progress_bar(current, total, found, elapsed, current_site="", width=30)
     return f"\r{Colors.CYAN}{Colors.BOLD}[⚡] Scanning{site_label}: [{bar}] {percent:.1f}% | Progress: {current}/{total} | Found: {Colors.GREEN}{found}{Colors.CYAN} | Time: {time_str} | ETA: {eta_str}{Colors.ENDC}"
 
 def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
+    # Determine username variations if surname is provided (name_surname)
+    variations = [username]
+    is_surname_search = False
+    if "_" in username:
+        parts = username.split("_")
+        if len(parts) == 2 and parts[0] and parts[1]:
+            first = parts[0]
+            last = parts[1]
+            variations = [
+                f"{first}_{last}",  # name_surname
+                f"{first}{last}",   # namesurname
+                f"{first}.{last}"   # name.surname
+            ]
+            is_surname_search = True
+
     print(f"\n{Colors.WARNING}[*] Starting search for Username: {Colors.BOLD}{username}{Colors.ENDC} ...")
-    print(f"{Colors.BLUE}[*] Searching {len(PLATFORMS)} platforms (Threads: {max_threads}, Timeout: {timeout}s){Colors.ENDC}")
+    if is_surname_search:
+        print(f"{Colors.BLUE}[*] Detected name_surname pattern. Scanning 3 variations: {', '.join(variations)}{Colors.ENDC}")
+    print(f"{Colors.BLUE}[*] Searching {len(PLATFORMS)} platforms across {len(variations)} username variations (Threads: {max_threads}, Timeout: {timeout}s){Colors.ENDC}")
     print("-" * 75)
     
     results = []
     found_count = 0
     not_found_count = 0
     error_count = 0
-    total_platforms = len(PLATFORMS)
+    total_checks = len(PLATFORMS) * len(variations)
     
     start_time = time.time()
-    sys.stdout.write(make_progress_bar(0, total_platforms, 0, 0, current_site="Starting"))
+    sys.stdout.write(make_progress_bar(0, total_checks, 0, 0, current_site="Starting"))
     sys.stdout.flush()
     
     interrupted = False
     try:
         with ThreadPoolExecutor(max_workers=max_threads) as executor:
-            futures = {
-                executor.submit(check_single_site, name, info, username, timeout): name 
-                for name, info in PLATFORMS.items()
-            }
+            futures = {}
+            for name, info in PLATFORMS.items():
+                for var in variations:
+                    futures[executor.submit(check_single_site, name, info, var, timeout)] = (name, var)
             
             for idx, future in enumerate(as_completed(futures), 1):
                 try:
                     res = future.result()
-                    site = res["site"]
+                    site, var = futures[future]
                     url = res["url"]
                     category = res["category"]
                     
@@ -1971,7 +1988,9 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
                         wayback_label = ""
                         if res.get("wayback") and res["wayback"].get("available"):
                             wayback_label = f" {Colors.BLUE}(Wayback: {res['wayback']['date']}){Colors.GREEN}"
-                        print(f"{Colors.GREEN}[+] [{category:<15}] {site:<15}{fullname_label}{wayback_label} -> {url}{Colors.ENDC}")
+                        
+                        var_label = f" [{var}]" if is_surname_search else ""
+                        print(f"{Colors.GREEN}[+] [{category:<15}] {site:<15}{var_label}{fullname_label}{wayback_label} -> {url}{Colors.ENDC}")
                         results.append(res)
                     elif res["exists"] is False:
                         not_found_count += 1
@@ -1979,7 +1998,7 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
                         error_count += 1
                     
                     elapsed = time.time() - start_time
-                    sys.stdout.write(make_progress_bar(idx, total_platforms, found_count, elapsed, current_site=site))
+                    sys.stdout.write(make_progress_bar(idx, total_checks, found_count, elapsed, current_site=f"{site}:{var}"))
                     sys.stdout.flush()
                 except Exception:
                     error_count += 1
