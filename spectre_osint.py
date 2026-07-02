@@ -2013,7 +2013,7 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
         if fname:
             cleaned_handle = fname.strip().lower()
             if cleaned_handle and " " not in cleaned_handle and cleaned_handle != username.lower():
-                if re.match(r"^[a-zA-Z0-9_\\-\.]+$", cleaned_handle):
+                if re.match(r"^[a-zA-Z0-9_\-\.]+$", cleaned_handle):
                     discovered_aliases.add(cleaned_handle)
 
     return {
