@@ -2,12 +2,61 @@ import random
 import os
 import re
 import sys
-import json
+import json, argparse
 import time
 import socket
 import hashlib
 import requests
 import urllib.parse
+import threading
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+# Global HTTP session for connection pooling
+session = requests.Session()
+
+# Simple per‑domain rate limiter (minimum interval between requests)
+_rate_limit_lock = threading.Lock()
+_last_request_time = {}
+MIN_INTERVAL = 0.5  # seconds
+
+def _rate_limit(url: str):
+    """Enforce a minimum interval between requests to the same domain."""
+    domain = urllib.parse.urlparse(url).netloc
+    with _rate_limit_lock:
+        now = time.time()
+        last = _last_request_time.get(domain, 0)
+        elapsed = now - last
+        if elapsed < MIN_INTERVAL:
+            time.sleep(MIN_INTERVAL - elapsed)
+        _last_request_time[domain] = time.time()
+
+def safe_get(url, **kwargs):
+    _rate_limit(url)
+    return session.get(url, **kwargs)
+
+def safe_post(url, **kwargs):
+    _rate_limit(url)
+    return session.post(url, **kwargs)
+
+
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+# Global HTTP session for connection pooling
+session = requests.Session()
+
+# Simple per‑domain rate limiter (minimum interval between requests)
+_rate_limit_lock = threading.Lock()
+_last_request_time = {}
+MIN_INTERVAL = 0.5  # seconds
+
+# Default list of User‑Agent strings (common browsers)
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+]
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 
@@ -1382,7 +1431,7 @@ def scrape_generic_metadata(html_text):
 def check_wayback_archive(url):
     api_url = f"http://archive.org/wayback/available?url={urllib.parse.quote(url)}"
     try:
-        r = requests.get(api_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+        r = safe_get(api_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
         if r.status_code == 200:
             data = r.json()
             snapshots = data.get("archived_snapshots", {})
@@ -1410,6 +1459,7 @@ def check_wayback_archive(url):
         pass
     return {"available": False}
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type(requests.exceptions.RequestException))
 def check_single_site(site_name, site_info, username, timeout):
     # Stealth Mode: Jitter delay to bypass blocks
     time.sleep(random.uniform(2.0, 6.0))
@@ -1432,7 +1482,7 @@ def check_single_site(site_name, site_info, username, timeout):
                     "query": "query TargetUserCheck($login: String!) { user(login: $login) { id login displayName } }"
                 }
             ]
-            response = requests.post(gql_url, json=query, headers=headers, timeout=timeout)
+            response = safe_post(gql_url, json=query, headers=headers, timeout=timeout)
             if response.status_code == 200:
                 data = response.json()
                 user_data = data[0].get("data", {}).get("user")
@@ -1451,7 +1501,7 @@ def check_single_site(site_name, site_info, username, timeout):
     elif site_name == "Duolingo":
         try:
             api_url = f"https://www.duolingo.com/2017-06-30/users?username={username}"
-            response = requests.get(api_url, headers=get_random_headers(), timeout=timeout)
+            response = safe_get(api_url, headers=get_random_headers(), timeout=timeout)
             if response.status_code == 200:
                 data = response.json()
                 users_list = data.get("users", [])
@@ -1471,7 +1521,7 @@ def check_single_site(site_name, site_info, username, timeout):
     elif site_name == "DailyMotion":
         try:
             api_url = f"https://api.dailymotion.com/user/{username}"
-            response = requests.get(api_url, headers=get_random_headers(), timeout=timeout)
+            response = safe_get(api_url, headers=get_random_headers(), timeout=timeout)
             if response.status_code == 200:
                 data = response.json()
                 wayback = {"available": False}
@@ -1487,7 +1537,7 @@ def check_single_site(site_name, site_info, username, timeout):
 
     # 2. General HTTP parsing check for other platforms
     try:
-        response = requests.get(target_url, headers=get_random_headers(), timeout=timeout, allow_redirects=True)
+        response = safe_get(target_url, headers=get_random_headers(), timeout=timeout, allow_redirects=True)
         exists = True
         
         if response.status_code == 404:
@@ -1608,7 +1658,7 @@ def check_single_site(site_name, site_info, username, timeout):
 def check_gravatar_profile(username):
     url = f"https://en.gravatar.com/{username.lower()}.json"
     try:
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        r = safe_get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r.status_code == 200:
             data = r.json()
             entry = data.get("entry", [{}])[0]
@@ -1672,7 +1722,7 @@ def search_ddg_dorks(query, limit=12):
     url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
     results = []
     try:
-        r = requests.get(url, headers=get_random_headers(), timeout=8)
+        r = safe_get(url, headers=get_random_headers(), timeout=8)
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, 'html.parser')
             result_divs = soup.find_all("div", class_="result__body")
@@ -1718,7 +1768,7 @@ def make_progress_bar(current, total, found, elapsed, width=30):
         eta_str = "?"
     return f"\r{Colors.CYAN}{Colors.BOLD}[⚡] Scanning: [{bar}] {percent:.1f}% | Progress: {current}/{total} | Found: {Colors.GREEN}{found}{Colors.CYAN} | Time: {time_str} | ETA: {eta_str}{Colors.ENDC}"
 
-def run_osint_search_cli(username, max_threads=2, timeout=8.0, deep_scan=True):
+def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     print(f"\n{Colors.WARNING}[*] Starting search for Username: {Colors.BOLD}{username}{Colors.ENDC} ...")
     print(f"{Colors.BLUE}[*] Searching {len(PLATFORMS)} platforms (Threads: {max_threads}, Timeout: {timeout}s){Colors.ENDC}")
     print("-" * 75)

@@ -16,6 +16,19 @@
 
 ---
 
+### Supported Platforms Overview
+
+| Category | Platforms |
+|----------|-----------|
+| Social Media | Twitter, Instagram, Facebook, LinkedIn, TikTok, Reddit |
+| Coding & Tech | GitHub, GitLab, Bitbucket, StackOverflow |
+| Gaming | Steam, Twitch, Discord, Xbox Live |
+| Audio/Video | YouTube, SoundCloud, Vimeo, Spotify |
+| Writing & Docs | Medium, WordPress, Blogger |
+| Others | ... (total 95 platforms) |
+
+---
+
 ## Installation & Setup
 
 1. Clone the repository:
