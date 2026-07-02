@@ -1355,6 +1355,13 @@ try:
 except Exception:
     pass
 
+# Always add Gmail for checking Gmail account existence
+PLATFORMS["Gmail"] = {
+    "url": "https://mail.google.com/mail/gxlu?email={}",
+    "category": "Social Media",
+    "error_type": "custom"
+}
+
 import random
 
 USER_AGENTS = [
@@ -1573,6 +1580,19 @@ def check_single_site(site_name, site_info, username, timeout):
                 return {"site": site_name, "url": target_url, "exists": False, "category": category}
         except Exception:
             return {"site": site_name, "url": target_url, "exists": None, "error": "API Error", "category": category}
+
+    elif site_name == "Gmail":
+        try:
+            email_check = f"{username}@gmail.com"
+            check_url = f"https://mail.google.com/mail/gxlu?email={email_check}"
+            response = safe_get(check_url, headers=get_random_headers(), timeout=timeout, allow_redirects=False)
+            set_cookie = response.headers.get("Set-Cookie", "")
+            if "COMPASS" in set_cookie or "COMPASS" in response.cookies:
+                return {"site": site_name, "url": f"mailto:{email_check}", "exists": True, "category": category}
+            else:
+                return {"site": site_name, "url": f"mailto:{email_check}", "exists": False, "category": category}
+        except Exception:
+            return {"site": site_name, "url": f"mailto:{email_check}", "exists": None, "error": "API Error", "category": category}
 
     # 2. General HTTP parsing check for other platforms
     try:
