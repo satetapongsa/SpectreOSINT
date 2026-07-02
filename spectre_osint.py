@@ -1911,7 +1911,7 @@ def search_ddg_dorks(query, limit=12):
 
 # --- CLI OSINT Program runner ---
 
-def make_progress_bar(current, total, found, elapsed, width=30):
+def make_progress_bar(current, total, found, elapsed, current_site="", width=30):
     percent = (current / total) * 100
     filled = int(width * current // total)
     bar = "█" * filled + "░" * (width - filled)
@@ -1928,7 +1928,8 @@ def make_progress_bar(current, total, found, elapsed, width=30):
         eta_str = f"{eta_min}m {eta_sec}s" if eta_min else f"{eta_sec}s"
     else:
         eta_str = "?"
-    return f"\r{Colors.CYAN}{Colors.BOLD}[⚡] Scanning: [{bar}] {percent:.1f}% | Progress: {current}/{total} | Found: {Colors.GREEN}{found}{Colors.CYAN} | Time: {time_str} | ETA: {eta_str}{Colors.ENDC}"
+    site_label = f" ({current_site})" if current_site else ""
+    return f"\r{Colors.CYAN}{Colors.BOLD}[⚡] Scanning{site_label}: [{bar}] {percent:.1f}% | Progress: {current}/{total} | Found: {Colors.GREEN}{found}{Colors.CYAN} | Time: {time_str} | ETA: {eta_str}{Colors.ENDC}"
 
 def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     print(f"\n{Colors.WARNING}[*] Starting search for Username: {Colors.BOLD}{username}{Colors.ENDC} ...")
@@ -1942,7 +1943,7 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     total_platforms = len(PLATFORMS)
     
     start_time = time.time()
-    sys.stdout.write(make_progress_bar(0, total_platforms, 0, 0))
+    sys.stdout.write(make_progress_bar(0, total_platforms, 0, 0, current_site="Starting"))
     sys.stdout.flush()
     
     interrupted = False
@@ -1978,7 +1979,7 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
                         error_count += 1
                     
                     elapsed = time.time() - start_time
-                    sys.stdout.write(make_progress_bar(idx, total_platforms, found_count, elapsed))
+                    sys.stdout.write(make_progress_bar(idx, total_platforms, found_count, elapsed, current_site=site))
                     sys.stdout.flush()
                 except Exception:
                     error_count += 1
