@@ -1923,115 +1923,6 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     sys.stdout.write('\r\033[K')
     sys.stdout.flush()
     
-    # Run Deep scan if requested
-    gravatar_info = None
-    domains_info = []
-    dorks_info = []
-    taken_domains = []
-    
-    if deep_scan:
-        print(f"\n{Colors.CYAN}{Colors.BOLD}>>> Starting Deep Search (Mentions, Comments & Tags) <<<{Colors.ENDC}")
-        
-        # Gravatar
-        print(f"{Colors.BLUE}[*] Checking Gravatar ID profile...{Colors.ENDC}", end="", flush=True)
-        gravatar_info = check_gravatar_profile(username)
-        if gravatar_info["found"]:
-            print(f" {Colors.GREEN}[Found!]{Colors.ENDC}")
-            print(f"    - Display Name: {gravatar_info['display_name']}")
-            if gravatar_info['location']:
-                print(f"    - Location: {gravatar_info['location']}")
-            if gravatar_info['about_me']:
-                print(f"    - Profile Bio: {gravatar_info['about_me']}")
-            if gravatar_info['accounts']:
-                print(f"    - Linked Accounts: {', '.join([a['name'] for a in gravatar_info['accounts']])}")
-        else:
-            print(f" {Colors.FAIL}[Not Found]{Colors.ENDC}")
-            
-        # Domain resolutions
-        print(f"{Colors.BLUE}[*] Searching matching domain registrations...{Colors.ENDC}", end="", flush=True)
-        domains_info = scan_domains_dns(username)
-        registered_info = [d for d in domains_info if d["status"] == "registered"]
-        taken_domains = [d["domain"] for d in registered_info]
-        if registered_info:
-            print(f" {Colors.GREEN}[Found {len(registered_info)} registered domains]{Colors.ENDC}")
-            for d in registered_info:
-                sub_label = ""
-                if d["subdomains"]:
-                    sub_names = [s["subdomain"] for s in d["subdomains"]]
-                    sub_label = f" (Subdomains: {', '.join(sub_names)})"
-                print(f"    - {d['domain']} -> IP: {d['ip']}{sub_label}")
-        else:
-            print(f" {Colors.FAIL}[No registered domains found]{Colors.ENDC}")
-            
-        # Advanced Mention, Comment, and Tag Crawler
-        print(f"{Colors.BLUE}[*] Harvesting public comments, tags, and posts...{Colors.ENDC}")
-        
-        prefix = username
-        if len(username) > 4:
-            prefix = username[:-1]
-            
-        queries = {
-            "Social Mentions & Tags": f'"{username}" (site:facebook.com OR site:instagram.com OR site:twitter.com OR site:tiktok.com OR site:linkedin.com)',
-            "Public Comments & Forums": f'"{username}" (site:reddit.com OR site:disqus.com OR site:medium.com OR site:quora.com) comment',
-            "Tagged & Profile Associations": f'"{username}" tagged OR "with {username}" OR "reply to {username}"',
-            "Leaked Documents & CVs": f'site:* "{username}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx',
-            "Contact Info Harvest": f'"{username}" ("gmail.com" OR "hotmail.com" OR "outlook.com" OR "email" OR "contact" OR "phone")',
-            "Email Harvester": f'"{prefix}" ("@gmail.com" OR "@hotmail.com" OR "@outlook.com" OR "@yahoo.com" OR "@proton.me" OR "@icloud.com")',
-            "Paste & Leak Forums": f'site:pastebin.com OR site:controlc.com OR site:rentry.co OR site:github.com/gist "{username}"',
-            "General Web Mentions": f'"{username}" -site:github.com -site:twitter.com -site:instagram.com -site:reddit.com'
-        }
-        
-        dorks_info = {}
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {
-                executor.submit(search_ddg_dorks, q_val, limit=12): q_key
-                for q_key, q_val in queries.items()
-            }
-            for future in as_completed(futures):
-                q_key = futures[future]
-                try:
-                    dorks_info[q_key] = future.result()
-                except:
-                    dorks_info[q_key] = []
-                    
-        any_found = False
-        for category, items in dorks_info.items():
-            if items:
-                any_found = True
-                print(f" {Colors.GREEN}[+] {category} ({len(items)} items found):{Colors.ENDC}")
-                for idx, item in enumerate(items, 1):
-                    try:
-                        parsed_link = urllib.parse.urlparse(item['link'])
-                        domain = parsed_link.netloc.replace("www.", "")
-                    except:
-                        domain = "web"
-                    print(f"    {idx}. [{domain}] {item['title']}")
-                    print(f"       Link: {item['link']}")
-                    if item.get("snippet"):
-                        print(f"       Snippet: {item['snippet']}")
-                    print()
-                    
-        if not any_found:
-            print(f" {Colors.FAIL}[No public mentions, comments, or tags found]{Colors.ENDC}")
-            
-
-    
-    discovered_aliases = set()
-    if gravatar_info and gravatar_info.get("found") and gravatar_info.get("accounts"):
-        for acc in gravatar_info["accounts"]:
-            usr = acc.get("username")
-            if usr and usr.lower() != username.lower():
-                discovered_aliases.add(usr.lower())
-                
-    for r in results:
-        meta = r.get("metadata", {})
-        fname = meta.get("fullname")
-        if fname:
-            cleaned_handle = fname.strip().lower()
-            if cleaned_handle and " " not in cleaned_handle and cleaned_handle != username.lower():
-                if re.match(r"^[a-zA-Z0-9_\-\.]+$", cleaned_handle):
-                    discovered_aliases.add(cleaned_handle)
-
     # Extracted Contacts
     emails = set()
     phones = set()
@@ -2053,23 +1944,9 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
         for m in PHONE_PATTERN.findall(bio):
             phones.add(m)
             
-    # Extract from dorks snippets
-    for category, items in dorks_info.items():
-        for item in items:
-            snippet = item.get("snippet", "")
-            title = item.get("title", "")
-            for m in EMAIL_PATTERN.findall(snippet):
-                if is_email_related(m, username):
-                    emails.add(m)
-            for m in EMAIL_PATTERN.findall(title):
-                if is_email_related(m, username):
-                    emails.add(m)
-            for m in PHONE_PATTERN.findall(snippet):
-                phones.add(m)
-                
     elapsed_time = time.time() - start_time
     
-    # 1. Print Detailed CLI Breakdown
+    # Print Detailed CLI Breakdown
     cat_counts = {}
     for r in results:
         cat = r.get("category", "Others")
@@ -2080,9 +1957,6 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     print(f"  {Colors.GREEN}- Profiles Found: {found_count} platforms{Colors.ENDC}")
     for cat, cnt in sorted(cat_counts.items()):
         print(f"    * {cat}: {Colors.GREEN}{cnt}{Colors.ENDC} profiles")
-    if deep_scan and taken_domains:
-        print(f"  {Colors.GREEN}- Registered Domains: {len(taken_domains)} domains{Colors.ENDC}")
-
     if emails:
         print(f"  {Colors.GREEN}- Extracted Emails: {', '.join(emails)}{Colors.ENDC}")
     if phones:
@@ -2093,12 +1967,6 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     # HTML report generation disabled per user request
 
     discovered_aliases = set()
-    if gravatar_info and gravatar_info.get("found") and gravatar_info.get("accounts"):
-        for acc in gravatar_info["accounts"]:
-            usr = acc.get("username")
-            if usr and usr.lower() != username.lower():
-                discovered_aliases.add(usr.lower())
-                
     for r in results:
         meta = r.get("metadata", {})
         fname = meta.get("fullname")
@@ -2110,9 +1978,6 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
 
     return {
         "found_profiles": results,
-        "gravatar": gravatar_info,
-        "domains": domains_info,
-        "dorks": dorks_info,
         "discovered_aliases": list(discovered_aliases)
     }
 
