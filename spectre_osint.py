@@ -18,7 +18,7 @@ session = requests.Session()
 # Simple per‑domain rate limiter (minimum interval between requests)
 _rate_limit_lock = threading.Lock()
 _last_request_time = {}
-MIN_INTERVAL = 0.5  # seconds
+MIN_INTERVAL = 0.05
 
 def _rate_limit(url: str):
     """Enforce a minimum interval between requests to the same domain."""
@@ -48,7 +48,7 @@ session = requests.Session()
 # Simple per‑domain rate limiter (minimum interval between requests)
 _rate_limit_lock = threading.Lock()
 _last_request_time = {}
-MIN_INTERVAL = 0.5  # seconds
+MIN_INTERVAL = 0.05
 
 # Default list of User‑Agent strings (common browsers)
 USER_AGENTS = [
@@ -255,15 +255,7 @@ PLATFORMS = {
         "error_code": 404
     },
 
-    # Load top‑100 platforms list
-_TOP_100_PATH = os.path.join(os.path.dirname(__file__), "top_100_platforms.json")
-with open(_TOP_100_PATH, "r", encoding="utf-8") as _f:
-    _TOP_100 = json.load(_f)
-
-# Filter PLATFORMS to the top 100 entries
-PLATFORMS = {k: v for k, v in PLATFORMS.items() if k in _TOP_100}
-
-# --- Social Media ---
+    
     "Reddit": {
         "url": "https://www.reddit.com/user/{}/",
         "category": "Social Media",
@@ -1791,6 +1783,7 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     sys.stdout.write(make_progress_bar(0, total_platforms, 0, 0))
     sys.stdout.flush()
     
+    interrupted = False
     try:
         with ThreadPoolExecutor(max_workers=max_threads) as executor:
             futures = {
@@ -1828,7 +1821,15 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
                 except Exception:
                     error_count += 1
     except KeyboardInterrupt:
-        print(f"\n{Colors.WARNING}[!] Scan interrupted by user. Running deep search and generating report...{Colors.ENDC}")
+        interrupted = True
+        for f in futures:
+            f.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
+        print(f"\n{Colors.WARNING}[!] Scan interrupted by user.{Colors.ENDC}")
+    
+    if interrupted:
+        print(f"{Colors.CYAN}[*] Exiting cleanly...{Colors.ENDC}")
+        os._exit(0)
             
     sys.stdout.write('\r\033[K')
     sys.stdout.flush()
@@ -2577,8 +2578,8 @@ def main():
             while not initial_username:
                 initial_username = input("Username cannot be empty. Please enter again: ").strip()
             
-        threads = 1
-        timeout = 5.0
+        threads = 20
+        timeout = 2.0
         deep = True
         
         scanned_usernames = set()
@@ -2608,6 +2609,7 @@ def main():
                         
     except KeyboardInterrupt:
         print(f"\n{Colors.FAIL}[!] Search cancelled by user.{Colors.ENDC}")
+        os._exit(0)
     sys.exit(0)
 
 if __name__ == "__main__":
