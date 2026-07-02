@@ -1953,8 +1953,8 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
     # Extract from found profiles
     for r in results:
         meta = r.get("metadata", {})
-        bio = meta.get("bio", "")
-        fullname = meta.get("fullname", "")
+        bio = meta.get("bio") or ""
+        fullname = meta.get("fullname") or ""
         for m in EMAIL_PATTERN.findall(bio):
             emails.add(m)
         for m in EMAIL_PATTERN.findall(fullname):
