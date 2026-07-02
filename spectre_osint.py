@@ -12,6 +12,33 @@ import threading
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+# Email and Phone regexes
+EMAIL_PATTERN = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
+PHONE_PATTERN = re.compile(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}')
+
+def is_email_related(email, username):
+    email = email.lower()
+    username = username.lower()
+    prefix = email.split('@')[0]
+    
+    if username in prefix:
+        return True
+        
+    if prefix in username and len(prefix) >= 4:
+        return True
+        
+    min_len = max(4, len(username) - 2) if len(username) > 4 else len(username)
+    if min_len < 3:
+        min_len = 3
+        
+    for i in range(len(username) - min_len + 1):
+        sub = username[i:i+min_len]
+        if sub in prefix:
+            return True
+            
+    return False
+
+
 # Global HTTP session for connection pooling
 session = requests.Session()
 adapter = requests.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50)
@@ -1648,6 +1675,12 @@ def check_single_site(site_name, site_info, username, timeout):
                     meta = scrape_generic_metadata(response.text)
             except Exception:
                 pass
+            try:
+                found_emails = [m for m in EMAIL_PATTERN.findall(response.text) if is_email_related(m, username)]
+                if found_emails:
+                    meta["found_emails"] = found_emails
+            except Exception:
+                pass
                 
             # Check Wayback archive in parallel
             wayback = {"available": False}
@@ -1889,12 +1922,17 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
         # Advanced Mention, Comment, and Tag Crawler
         print(f"{Colors.BLUE}[*] Harvesting public comments, tags, and posts...{Colors.ENDC}")
         
+        prefix = username
+        if len(username) > 4:
+            prefix = username[:-1]
+            
         queries = {
             "Social Mentions & Tags": f'"{username}" (site:facebook.com OR site:instagram.com OR site:twitter.com OR site:tiktok.com OR site:linkedin.com)',
             "Public Comments & Forums": f'"{username}" (site:reddit.com OR site:disqus.com OR site:medium.com OR site:quora.com) comment',
             "Tagged & Profile Associations": f'"{username}" tagged OR "with {username}" OR "reply to {username}"',
             "Leaked Documents & CVs": f'site:* "{username}" filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx',
             "Contact Info Harvest": f'"{username}" ("gmail.com" OR "hotmail.com" OR "outlook.com" OR "email" OR "contact" OR "phone")',
+            "Email Harvester": f'"{prefix}" ("@gmail.com" OR "@hotmail.com" OR "@outlook.com" OR "@yahoo.com" OR "@proton.me" OR "@icloud.com")',
             "Paste & Leak Forums": f'site:pastebin.com OR site:controlc.com OR site:rentry.co OR site:github.com/gist "{username}"',
             "General Web Mentions": f'"{username}" -site:github.com -site:twitter.com -site:instagram.com -site:reddit.com'
         }
@@ -1960,9 +1998,14 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
         bio = meta.get("bio") or ""
         fullname = meta.get("fullname") or ""
         for m in EMAIL_PATTERN.findall(bio):
-            emails.add(m)
+            if is_email_related(m, username):
+                emails.add(m)
         for m in EMAIL_PATTERN.findall(fullname):
-            emails.add(m)
+            if is_email_related(m, username):
+                emails.add(m)
+        for m in meta.get("found_emails", []):
+            if is_email_related(m, username):
+                emails.add(m)
         for m in PHONE_PATTERN.findall(bio):
             phones.add(m)
             
@@ -1972,9 +2015,11 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
             snippet = item.get("snippet", "")
             title = item.get("title", "")
             for m in EMAIL_PATTERN.findall(snippet):
-                emails.add(m)
+                if is_email_related(m, username):
+                    emails.add(m)
             for m in EMAIL_PATTERN.findall(title):
-                emails.add(m)
+                if is_email_related(m, username):
+                    emails.add(m)
             for m in PHONE_PATTERN.findall(snippet):
                 phones.add(m)
                 
@@ -2028,10 +2073,6 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
         "discovered_aliases": list(discovered_aliases)
     }
 
-
-# Email and Phone regexes
-EMAIL_PATTERN = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
-PHONE_PATTERN = re.compile(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}')
 
 def generate_html_report(username, results, gravatar_info, domains_info, dorks_info, emails, phones, links, mentions, elapsed_time):
     # Report generation disabled per user request
