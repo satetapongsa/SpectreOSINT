@@ -1355,7 +1355,14 @@ try:
 except Exception:
     pass
 
-# Always add Gmail for checking Gmail account existence
+# Add LinkedIn and Gmail specifically to the final platform list
+PLATFORMS["LinkedIn"] = {
+    "url": "https://www.linkedin.com/in/{}",
+    "category": "Social Media",
+    "error_type": "message",
+    "error_msg": "Page not found"
+}
+
 PLATFORMS["Gmail"] = {
     "url": "https://mail.google.com/mail/gxlu?email={}",
     "category": "Social Media",

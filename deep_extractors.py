@@ -439,6 +439,24 @@ def extract_facebook(username: str, html_text: str = None) -> Dict[str, Any]:
     avatar = og_img.get("content") if og_img else None
     return {"fullname": fullname or username, "avatar": avatar, "bio": bio}
 
+def extract_linkedin(username: str, html_text: str = None) -> Dict[str, Any]:
+    if not html_text:
+        html_text = fetch_html(f"https://www.linkedin.com/in/{username}")
+    if not html_text:
+        return {}
+    soup = BeautifulSoup(html_text, "html.parser")
+    fullname = None
+    title_tag = soup.find("title")
+    if title_tag:
+        title_text = title_tag.get_text()
+        if "LinkedIn" in title_text:
+            fullname = title_text.split(" - ")[0].split(" | ")[0].strip()
+    og_desc = soup.find("meta", property="og:description")
+    bio = og_desc.get("content") if og_desc else None
+    og_img = soup.find("meta", property="og:image")
+    avatar = og_img.get("content") if og_img else None
+    return {"fullname": fullname or username, "avatar": avatar, "bio": bio}
+
 EXTRACTORS = {
     "GitHub": extract_github,
     "GitLab": extract_gitlab,
@@ -464,6 +482,7 @@ EXTRACTORS = {
     "NameMC (Minecraft)": extract_namemc,
     "Wikipedia": extract_wikipedia,
     "Facebook": extract_facebook,
+    "LinkedIn": extract_linkedin,
 }
 
 def deep_extract(platform: str, username: str, html_text: str = None) -> Dict[str, Any]:
