@@ -255,7 +255,15 @@ PLATFORMS = {
         "error_code": 404
     },
 
-    # --- Social Media ---
+    # Load top‑100 platforms list
+_TOP_100_PATH = os.path.join(os.path.dirname(__file__), "top_100_platforms.json")
+with open(_TOP_100_PATH, "r", encoding="utf-8") as _f:
+    _TOP_100 = json.load(_f)
+
+# Filter PLATFORMS to the top 100 entries
+PLATFORMS = {k: v for k, v in PLATFORMS.items() if k in _TOP_100}
+
+# --- Social Media ---
     "Reddit": {
         "url": "https://www.reddit.com/user/{}/",
         "category": "Social Media",
@@ -2471,7 +2479,7 @@ def generate_html_report(username, results, gravatar_info, domains_info, dorks_i
             <div class="header-meta">
                 <p>Report Generated: <span>{time.strftime("%d %B %Y, %H:%M:%S")}</span></p>
                 <p>Scan Elapsed Time: <span>{elapsed_time:.2f} seconds</span></p>
-                <p>Platforms Checked: <span>200</span></p>
+                <p>Platforms Checked: <span>{len(PLATFORMS)}</span></p>
             </div>
         </header>
 
