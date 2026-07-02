@@ -14,11 +14,13 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 # Global HTTP session for connection pooling
 session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50)
+session.mount('http://', adapter)
+session.mount('https://', adapter)
 
-# Simple per‑domain rate limiter (minimum interval between requests)
 _rate_limit_lock = threading.Lock()
 _last_request_time = {}
-MIN_INTERVAL = 0.05
+MIN_INTERVAL = 0
 
 def _rate_limit(url: str):
     """Enforce a minimum interval between requests to the same domain."""
@@ -44,11 +46,13 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 # Global HTTP session for connection pooling
 session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(pool_connections=50, pool_maxsize=50)
+session.mount('http://', adapter)
+session.mount('https://', adapter)
 
-# Simple per‑domain rate limiter (minimum interval between requests)
 _rate_limit_lock = threading.Lock()
 _last_request_time = {}
-MIN_INTERVAL = 0.05
+MIN_INTERVAL = 0
 
 # Default list of User‑Agent strings (common browsers)
 USER_AGENTS = [
@@ -1439,7 +1443,7 @@ def scrape_generic_metadata(html_text):
 def check_wayback_archive(url):
     api_url = f"http://archive.org/wayback/available?url={urllib.parse.quote(url)}"
     try:
-        r = safe_get(api_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+        r = safe_get(api_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=2)
         if r.status_code == 200:
             data = r.json()
             snapshots = data.get("archived_snapshots", {})
@@ -1666,7 +1670,7 @@ def check_single_site(site_name, site_info, username, timeout):
 def check_gravatar_profile(username):
     url = f"https://en.gravatar.com/{username.lower()}.json"
     try:
-        r = safe_get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        r = safe_get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=2)
         if r.status_code == 200:
             data = r.json()
             entry = data.get("entry", [{}])[0]
@@ -1707,7 +1711,7 @@ def scan_domains_dns(username):
                     return {"subdomain": sub_domain, "ip": sub_ip}
                 except socket.gaierror:
                     return None
-            with ThreadPoolExecutor(max_workers=5) as executor:
+            with ThreadPoolExecutor(max_workers=10) as executor:
                 sub_results = list(executor.map(check_sub, subdomains))
                 resolved_subs = [r for r in sub_results if r is not None]
             results.append({
@@ -1730,7 +1734,7 @@ def search_ddg_dorks(query, limit=12):
     url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
     results = []
     try:
-        r = safe_get(url, headers=get_random_headers(), timeout=8)
+        r = safe_get(url, headers=get_random_headers(), timeout=3)
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, 'html.parser')
             result_divs = soup.find_all("div", class_="result__body")
@@ -1896,7 +1900,7 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
         }
         
         dorks_info = {}
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {
                 executor.submit(search_ddg_dorks, q_val, limit=12): q_key
                 for q_key, q_val in queries.items()
@@ -2586,8 +2590,8 @@ def main():
             while not initial_username:
                 initial_username = input("Username cannot be empty. Please enter again: ").strip()
             
-        threads = 20
-        timeout = 2.0
+        threads = 50
+        timeout = 1.5
         deep = True
         
         scanned_usernames = set()
