@@ -67,38 +67,7 @@ This will prompt you to enter the username directly in the console.
 
 ## Sample Console Output
 
-```text
-               [ SpectreOSINT v3.0 ]
-   Ultimate Username Hunter & Deep OSINT Search Tool
-
-[*] Starting search for Username: satet ...
-[*] Searching 95 platforms (Threads: 15, Timeout: 5.0s)
----------------------------------------------------------------------------
-[+] [Social Media  ] Twitter/X       -> https://twitter.com/satet
-[+] [Coding & Tech ] GitHub          -> https://github.com/satet
-[+] [Others        ] Duolingo        -> https://www.duolingo.com/profile/satet
-...
-
->>> Starting Deep Search (Mentions, Comments & Tags) <<<
-[*] Checking Gravatar ID profile... [Found!]
-[*] Searching matching domain registrations... [Found 4 registered domains]
-    - Registered: satet.com, satet.net, satet.org, satet.xyz
-[*] Harvesting public comments, tags, and posts...
- [+] Social Mentions & Tags (4 items found):
-    1. [twitter.com] Satet (s_atet) / Twitter
-       Link: https://twitter.com/s_atet
-       Snippet: The latest Tweets from Satet...
-    2. [pinterest.com] SATET (satet88) on Pinterest
-       Link: https://www.pinterest.com/satet88/
-
----------------------------------------------------------------------------
-Scan Summary (Elapsed Time: 13.91s):
-  - Profiles Found: 25 platforms
-  - Registered Domains: 4 domains
-  - Profiles Not Found: 56 platforms
-  - Errors/Blocked: 14 platforms
----------------------------------------------------------------------------
-```
+![Sample Console Output](tol.png)
 
 ---
 
