@@ -1687,14 +1687,21 @@ def check_single_site(site_name, site_info, username, timeout):
             # Parse metadata
             meta = {}
             try:
-                if site_name == "GitHub":
-                    meta = scrape_github_metadata(response.text)
-                elif site_name == "GitLab":
-                    meta = scrape_gitlab_metadata(response.text)
-                else:
-                    meta = scrape_generic_metadata(response.text)
+                import deep_extractors
+                meta = deep_extractors.deep_extract(site_name, username, response.text)
             except Exception:
                 pass
+                
+            if not meta:
+                try:
+                    if site_name == "GitHub":
+                        meta = scrape_github_metadata(response.text)
+                    elif site_name == "GitLab":
+                        meta = scrape_gitlab_metadata(response.text)
+                    else:
+                        meta = scrape_generic_metadata(response.text)
+                except Exception:
+                    pass
             try:
                 found_emails = [m for m in EMAIL_PATTERN.findall(response.text) if is_email_related(m, username)]
                 if found_emails:
