@@ -1316,6 +1316,14 @@ PLATFORMS = {
     }
 }
 
+_TOP_100_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "top_100_platforms.json")
+try:
+    with open(_TOP_100_PATH, "r", encoding="utf-8") as _f:
+        _TOP_100 = set(json.load(_f))
+    PLATFORMS = {k: v for k, v in PLATFORMS.items() if k in _TOP_100}
+except Exception:
+    pass
+
 import random
 
 USER_AGENTS = [
