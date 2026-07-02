@@ -2594,30 +2594,7 @@ def main():
         timeout = 1.5
         deep = True
         
-        scanned_usernames = set()
-        queue = [(initial_username, 1)]
-        
-        while queue:
-            current_target, current_depth = queue.pop(0)
-            if current_target.lower() in scanned_usernames:
-                continue
-                
-            scanned_usernames.add(current_target.lower())
-            
-            if current_depth > 1:
-                print("\n" + "=" * 75)
-                print(f"{Colors.BOLD}{Colors.WARNING}[★] Recursive Scan (Depth {current_depth}): Target = {current_target}{Colors.ENDC}")
-                print("=" * 75)
-                
-            scan_res = run_osint_search_cli(current_target, max_threads=threads, timeout=timeout, deep_scan=deep)
-            
-            aliases = scan_res.get("discovered_aliases", [])
-            if aliases and current_depth < 2:
-                new_aliases = [a for a in aliases if a not in scanned_usernames]
-                if new_aliases:
-                    print(f"\n{Colors.BOLD}{Colors.GREEN}[!] Discovered linked usernames/aliases: {', '.join(new_aliases)}{Colors.ENDC}")
-                    for alias in new_aliases:
-                        queue.append((alias, current_depth + 1))
+        run_osint_search_cli(initial_username, max_threads=threads, timeout=timeout, deep_scan=deep)
                         
     except KeyboardInterrupt:
         print(f"\n{Colors.FAIL}[!] Search cancelled by user.{Colors.ENDC}")
