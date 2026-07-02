@@ -1613,11 +1613,21 @@ def check_single_site(site_name, site_info, username, timeout):
                 if exists_msg not in page_content:
                     exists = False
             
-            # WAF/Block checks
+            # WAF/Block checks and generic login wall / landing page false positive checks
             if exists:
                 page_content_lower = response.text.lower()
                 if site_name == "TikTok" and ("slardar" in page_content_lower or "waf" in page_content_lower):
                     exists = False
+                
+                # If there is a password input field, but username is not in the text, it's a login wall
+                if exists and ('type="password"' in page_content_lower or "type='password'" in page_content_lower):
+                    if username.lower() not in page_content_lower:
+                        exists = False
+                        
+                # If it's a generic sign in / sign up page without the username
+                if exists and any(kw in page_content_lower for kw in ["login", "sign in", "signin", "sign up", "signup", "create account", "join now"]):
+                    if username.lower() not in page_content_lower:
+                        exists = False
             
             if exists:
                 # Soft-404 Title and Heading Check
@@ -2065,8 +2075,7 @@ def run_osint_search_cli(username, max_threads=10, timeout=8.0, deep_scan=True):
         print(f"    * {cat}: {Colors.GREEN}{cnt}{Colors.ENDC} profiles")
     if deep_scan and taken_domains:
         print(f"  {Colors.GREEN}- Registered Domains: {len(taken_domains)} domains{Colors.ENDC}")
-    print(f"  {Colors.FAIL}- Profiles Not Found: {not_found_count} platforms{Colors.ENDC}")
-    print(f"  {Colors.WARNING}- Errors/Blocked: {error_count} platforms{Colors.ENDC}")
+
     if emails:
         print(f"  {Colors.GREEN}- Extracted Emails: {', '.join(emails)}{Colors.ENDC}")
     if phones:
