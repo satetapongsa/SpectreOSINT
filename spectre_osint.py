@@ -2590,8 +2590,8 @@ def main():
             while not initial_username:
                 initial_username = input("Username cannot be empty. Please enter again: ").strip()
             
-        threads = 50
-        timeout = 1.5
+        threads = 30
+        timeout = 2.0
         deep = True
         
         run_osint_search_cli(initial_username, max_threads=threads, timeout=timeout, deep_scan=deep)
