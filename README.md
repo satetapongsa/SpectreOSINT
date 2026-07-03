@@ -79,6 +79,22 @@ Scan Summary (Elapsed Time: 12.14s):
 ---------------------------------------------------------------------------
 ```
 
+### 3. Facebook Personal Profile Scanning (Optional)
+By default, Facebook redirects all unauthenticated visitors of personal profiles to a login wall, meaning unauthenticated tools cannot distinguish between a real private profile and a non-existent one.
+To bypass this limitation and scan personal profiles, you can provide your Facebook session cookie via the `FB_COOKIE` environment variable:
+
+*   **On Windows (PowerShell):**
+    ```powershell
+    $env:FB_COOKIE="your_facebook_cookie_string_here"
+    python spectre_osint.py satetapong_sanguansuk
+    ```
+*   **On Linux/macOS:**
+    ```bash
+    export FB_COOKIE="your_facebook_cookie_string_here"
+    python spectre_osint.py satetapong_sanguansuk
+    ```
+*(You can obtain this cookie string by copying the `Cookie` header from any authorized request to Facebook in your browser's Developer Tools Network tab).*
+
 ---
 
 ## Sample Console Output

@@ -12,6 +12,9 @@ import threading
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+# Facebook Session Cookie (Paste your FB session cookie here to scan personal profiles)
+FB_COOKIE = os.environ.get("FB_COOKIE", "")
+
 # Email and Phone regexes
 EMAIL_PATTERN = re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}')
 PHONE_PATTERN = re.compile(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}')
@@ -1671,6 +1674,206 @@ def check_single_site(site_name, site_info, username, timeout):
             else:
                 return {"site": site_name, "url": target_url, "exists": False, "category": category}
 
+        except Exception:
+            return {"site": site_name, "url": target_url, "exists": False, "category": category}
+
+    elif site_name == "TikTok":
+        try:
+            # 1. Fallback to Urlebird for TikTok checks
+            target_check_url = f"https://urlebird.com/user/{username}/"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            response = safe_get(target_check_url, headers=headers, timeout=timeout)
+            
+            exists = False
+            metadata = {}
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                title_text = soup.title.string.strip() if soup.title and soup.title.string else ""
+                
+                if f"@{username.lower()}" in title_text.lower():
+                    exists = True
+                    fullname = title_text.split("(@")[0].strip()
+                    fullname = fullname.replace("✔", "").strip()
+                    
+                    avatar = None
+                    imgs = soup.find_all('img')
+                    for img in imgs:
+                        src = img.get('src', '')
+                        if 'tiktokcdn.com' in src:
+                            avatar = src
+                            break
+                    metadata = {"fullname": fullname or username, "avatar": avatar}
+                    
+            if exists:
+                wayback = {"available": False}
+                try:
+                    wayback = check_wayback_archive(target_url)
+                except:
+                    pass
+                return {"site": site_name, "url": target_url, "exists": True, "category": category, "metadata": metadata, "wayback": wayback}
+            else:
+                return {"site": site_name, "url": target_url, "exists": False, "category": category}
+                
+        except Exception:
+            return {"site": site_name, "url": target_url, "exists": False, "category": category}
+
+    elif site_name == "Facebook":
+        try:
+            target_check_url = f"https://www.facebook.com/{username}/"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9"
+            }
+            if FB_COOKIE:
+                headers["Cookie"] = FB_COOKIE
+                
+            response = safe_get(target_check_url, headers=headers, timeout=timeout)
+            
+            exists = False
+            metadata = {}
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                title_text = soup.title.string.strip() if soup.title and soup.title.string else ""
+                
+                is_login_or_generic = title_text.lower() in [
+                    "facebook", "login to facebook", "facebook - log in or sign up", 
+                    "log in to facebook", "page not found"
+                ]
+                
+                if not is_login_or_generic:
+                    exists = True
+                    fullname = title_text
+                    
+                    og_desc = soup.find("meta", property="og:description")
+                    bio = og_desc.get("content") if og_desc else None
+                    og_img = soup.find("meta", property="og:image")
+                    avatar = og_img.get("content") if og_img else None
+                    metadata = {"fullname": fullname, "bio": bio, "avatar": avatar}
+                    
+            if exists:
+                wayback = {"available": False}
+                try:
+                    wayback = check_wayback_archive(target_url)
+                except:
+                    pass
+                return {"site": site_name, "url": target_url, "exists": True, "category": category, "metadata": metadata, "wayback": wayback}
+            else:
+                return {"site": site_name, "url": target_url, "exists": False, "category": category}
+                
+        except Exception:
+            return {"site": site_name, "url": target_url, "exists": False, "category": category}
+
+    elif site_name == "LinkedIn":
+        try:
+            target_check_url = f"https://www.linkedin.com/in/{username}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"}
+            response = safe_get(target_check_url, headers=headers, timeout=timeout)
+            
+            exists = False
+            metadata = {}
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                title_text = soup.title.string.strip() if soup.title and soup.title.string else ""
+                
+                is_authwall = any(kw in response.url.lower() or kw in title_text.lower() for kw in ["authwall", "login", "signin", "sign in", "page not found"])
+                
+                if not is_authwall and "linkedin" in title_text.lower():
+                    exists = True
+                    fullname = title_text.split(" - ")[0].split(" | ")[0].strip()
+                    
+                    og_desc = soup.find("meta", property="og:description")
+                    bio = og_desc.get("content") if og_desc else None
+                    og_img = soup.find("meta", property="og:image")
+                    avatar = og_img.get("content") if og_img else None
+                    metadata = {"fullname": fullname, "bio": bio, "avatar": avatar}
+                    
+            if exists:
+                wayback = {"available": False}
+                try:
+                    wayback = check_wayback_archive(target_url)
+                except:
+                    pass
+                return {"site": site_name, "url": target_url, "exists": True, "category": category, "metadata": metadata, "wayback": wayback}
+            else:
+                return {"site": site_name, "url": target_url, "exists": False, "category": category}
+        except Exception:
+            return {"site": site_name, "url": target_url, "exists": False, "category": category}
+
+    elif site_name == "Twitter/X":
+        try:
+            target_check_url = f"https://twitter.com/{username}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            response = safe_get(target_check_url, headers=headers, timeout=timeout)
+            
+            exists = False
+            metadata = {}
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                title_text = soup.title.string.strip() if soup.title and soup.title.string else ""
+                
+                og_title = soup.find("meta", property="og:title")
+                title_val = og_title.get("content", "") if og_title else ""
+                
+                if f"@{username.lower()}" in title_text.lower() or f"@{username.lower()}" in title_val.lower():
+                    exists = True
+                    fullname = title_text.split("(@")[0].strip()
+                    
+                    og_desc = soup.find("meta", property="og:description")
+                    bio = og_desc.get("content") if og_desc else None
+                    og_img = soup.find("meta", property="og:image")
+                    avatar = og_img.get("content") if og_img else None
+                    metadata = {"fullname": fullname or username, "bio": bio, "avatar": avatar}
+                    
+            if exists:
+                wayback = {"available": False}
+                try:
+                    wayback = check_wayback_archive(target_url)
+                except:
+                    pass
+                return {"site": site_name, "url": target_url, "exists": True, "category": category, "metadata": metadata, "wayback": wayback}
+            else:
+                return {"site": site_name, "url": target_url, "exists": False, "category": category}
+                
+        except Exception:
+            return {"site": site_name, "url": target_url, "exists": False, "category": category}
+
+    elif site_name == "Telegram":
+        try:
+            target_check_url = f"https://t.me/{username}"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            response = safe_get(target_check_url, headers=headers, timeout=timeout)
+            
+            exists = False
+            metadata = {}
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                title_text = soup.title.string.strip() if soup.title and soup.title.string else ""
+                
+                if f"@{username.lower()}" in title_text.lower() or "contact @" in title_text.lower():
+                    exists = True
+                    fullname = title_text.replace("Telegram: Contact @", "").replace("Telegram:", "").strip()
+                    
+                    desc_div = soup.find("div", class_="tgme_page_description")
+                    bio = desc_div.text.strip() if desc_div else None
+                    avatar_img = soup.find("img", class_="tgme_page_photo_image")
+                    avatar = avatar_img.get("src") if avatar_img else None
+                    metadata = {"fullname": fullname or username, "bio": bio, "avatar": avatar}
+                    
+            if exists:
+                wayback = {"available": False}
+                try:
+                    wayback = check_wayback_archive(target_url)
+                except:
+                    pass
+                return {"site": site_name, "url": target_url, "exists": True, "category": category, "metadata": metadata, "wayback": wayback}
+            else:
+                return {"site": site_name, "url": target_url, "exists": False, "category": category}
+                
         except Exception:
             return {"site": site_name, "url": target_url, "exists": False, "category": category}
 
